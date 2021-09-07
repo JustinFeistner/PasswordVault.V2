@@ -1,5 +1,6 @@
 ﻿using Microsoft.VisualBasic.FileIO;
 using System;
+using System.Data;
 using System.Data.SQLite;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -16,27 +17,36 @@ namespace PasswordVault.V2
 
             OpenConnection(connection);
 
+            var tableName = "justin";
+
             var stop = true;
 
             while (stop)
             {
                 Console.WriteLine("What would you like to do?\n\t- (C)reate a new table\n\t- (A)dd a new record\n\t- (S)earch for a record\n\t- (U)pdate a record\n\t- (D)elete a record");
-                var choice = Console.ReadLine();
+                var choice = Console.ReadLine().ToLower();
 
-                if (choice == "c")
+                switch (choice)
                 {
-                    CreateTable(connection);
+                    case "c":
+                        CreateTable(connection, tableName);
+                        break;
+                    case "a":
+                        AddNewRecord(connection, tableName);
+                        break;
+                    case "s":
+                        SearchRecords(connection, tableName);
+                        break;
+                    case "u":
+                        UpdateRecord(connection, tableName);
+                        break;
+                    case "d":
+                        DeleteRecord(connection, tableName);
+                        break;
                 }
-                else if (choice == "a")
-                {
-                    AddNewRecord(connection);
-                }
-                else if (choice == "s")
-                {
-                    SearchRecords(connection);
-                }
+
                 Console.WriteLine("Would you like to end this application (Y/N)?");
-                var endApp = Console.ReadLine();
+                var endApp = Console.ReadLine().ToLower();
                 if (endApp == "y")
                 {
                     stop = false;
@@ -46,38 +56,89 @@ namespace PasswordVault.V2
             CloseConnection(connection);
         }
 
+        private static void DeleteRecord(SQLiteConnection connection, string tableName)
+        {
+            SearchRecords(connection, tableName);
+
+            Console.WriteLine("Please choose the ID for the record you would like to delete: ");
+            var recordId = Int32.Parse(Console.ReadLine());
+
+            var text = $"DELETE FROM {tableName} WHERE id = {recordId}";
+            var cmd = new SQLiteCommand(text, connection);
+            cmd.ExecuteNonQuery();
+        }
+
+        private static void UpdateRecord(SQLiteConnection connection, string tableName)
+        {
+            SearchRecords(connection, tableName);
+
+            Console.WriteLine("Please choose the ID for the record you would like to modify: ");
+            var recordId = Int32.Parse(Console.ReadLine());
+
+            Console.WriteLine("What would you like to modify? \n\t- (S)ervice\n\t- (U)serName\n\t- (P)assword\n\t- (N)ote");
+            var columnName = Console.ReadLine().ToLower();
+
+            switch (columnName)
+            {
+                case "s":
+                    columnName = "service";
+                    break;
+                case "u":
+                    columnName = "userName";
+                    break;
+                case "p":
+                    columnName = "password";
+                    break;
+                case "n":
+                    columnName = "notes";
+                    break;
+            }
+
+            Console.WriteLine("Please enter the new value:");
+            var newValue = Console.ReadLine();
+
+            var text = $"UPDATE {tableName} SET {columnName} = '{newValue}' WHERE id = {recordId}";
+            var cmd = new SQLiteCommand(text, connection);
+            cmd.ExecuteNonQuery();
+        }
+
         /// <summary>
+        /// https://zetcode.com/csharp/sqlite/
         /// https://www.csharp-console-examples.com/general/creating-sqlite-database-and-table-in-csharp-console/
         /// </summary>
         /// <param name="connection"></param>
-        private static void SearchRecords(SQLiteConnection connection)
+        private static void SearchRecords(SQLiteConnection connection, string tableName)
         {
-            Console.WriteLine("Which table do you want? ");
-            var tableName = Console.ReadLine();
+            Console.WriteLine("Do you want (A)ll records or search for (S)pecific record?");
+            var decision = Console.ReadLine().ToLower();
 
-            Console.WriteLine("What is the name of the service you are looking for? ");
-            var serviceName = Console.ReadLine();
+            var text = string.Empty;
 
-            //var text = $"SELECT * FROM {tableName} WHERE service = '{serviceName}'";
-            var text = $"SELECT * FROM {tableName} WHERE service LIKE '%{serviceName}%'";
+            if (decision == "a")
+            {
+                text = $"SELECT * FROM {tableName}";
+            }
+            else
+            {
+                Console.WriteLine("What is the name of the service you are looking for? ");
+                var serviceName = Console.ReadLine();
+
+                text = $"SELECT * FROM {tableName} WHERE service LIKE '%{serviceName}%'";
+            }
+
             var cmd = new SQLiteCommand(text, connection);
 
             var dataReader = cmd.ExecuteReader();
-            //int counter = 0;
-
+            Console.WriteLine($"{dataReader.GetName(0), 3}{dataReader.GetName(1), 15}{dataReader.GetName(2), 15}{dataReader.GetName(3), 15}{dataReader.GetName(4), 30}");
             while (dataReader.Read())
             {
-                //counter++;
-                Console.WriteLine(dataReader[0] + " : " + dataReader[1] + " " + dataReader[2] + " " + dataReader[3] + " " + dataReader[4]);
+                Console.WriteLine($@"{dataReader.GetInt32(0), 3}{dataReader.GetString(1), 15}{dataReader.GetString(2), 15}{dataReader.GetString(3), 15}{dataReader.GetString(4), 30}");
             }
         }
 
-        private static void AddNewRecord(SQLiteConnection connection)
+        private static void AddNewRecord(SQLiteConnection connection, string tableName)
         {
             var cmd = new SQLiteCommand(connection);
-            Console.WriteLine("Which table do you want? ");
-
-            var tableName = Console.ReadLine();
 
             var newRecord = true;
 
@@ -110,11 +171,8 @@ namespace PasswordVault.V2
             }
         }
 
-        private static void CreateTable(SQLiteConnection connection)
+        private static void CreateTable(SQLiteConnection connection, string tableName)
         {
-            Console.WriteLine("Please choose a table name: ");
-            var tableName = Console.ReadLine();
-
             var cmd = new SQLiteCommand(connection);
 
             cmd.CommandText = $"DROP TABLE IF EXISTS {tableName}";
@@ -122,7 +180,6 @@ namespace PasswordVault.V2
 
             cmd.CommandText = $"CREATE TABLE {tableName}(id INTEGER PRIMARY KEY, service TEXT, userName TEXT, password TEXT, notes TEXT)";
             cmd.ExecuteNonQuery();
-
         }
 
         private static void CloseConnection(SQLiteConnection connection)
@@ -147,8 +204,6 @@ namespace PasswordVault.V2
         private static void Intro()
         {
             Console.WriteLine("Welcome to the Password Vault");
-
-
         }
     }
 }
